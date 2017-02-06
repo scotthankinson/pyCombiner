@@ -1,0 +1,32 @@
+service: aws-python-simple-http-endpoint
+
+frameworkVersion: ">=1.2.0 <2.0.0"
+
+provider:
+  name: aws
+  runtime: python2.7
+  stage: dev
+  role: ${file(deploy.env.yml):IAM_ROLE}
+  timeout: 300 # Combine takes a while to process
+  environment:
+    ENV_VARIABLE: ${file(deploy.env.yml):ENV_VARIABLE}
+
+functions:
+  combineScrubber:  # Perform any cleanup on objects
+    handler: handler.scrubber
+    events:
+      - s3:
+          bucket: ${file(deploy.env.yml):SOURCE_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploaded/
+            - suffix: .json
+  combineWatcher: # Watch for multi-part pieces arriving 
+    handler: handler.watcher
+    events:
+      - http:
+          method: GET
+          path: /watchQueue
+  combineRunner: # Multi-Part upload objects into a single large file 
+    handler: handler.runner
+

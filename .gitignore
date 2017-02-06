@@ -1,0 +1,11 @@
+.DS_Store
+.venv
+.vscode
+.serverless
+data.json
+temp/
+vendored/
+
+*.zip
+
+deploy.env.yml
