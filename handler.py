@@ -2,6 +2,8 @@
 Handler for a series of pyCombiner Lambda Events
 """
 # Set up paths to support loading from /vendored
+import json
+import logging
 import sys
 import os
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -9,15 +11,16 @@ sys.path.append(os.path.join(HERE, "./"))
 sys.path.append(os.path.join(HERE, "./vendored"))
 
 # Rest of imports
-import json
-import logging
 import boto3
 from lib import combine
 
-s3 = boto3.client("s3")
+__S3 = boto3.client("s3")
 logging.basicConfig(format="%(asctime)s => %(message)s")
 
-BUCKET = os.environ["SOURCE_BUCKET"]
+if "SOURCE_BUCKET" in os.environ:
+    BUCKET = os.environ["SOURCE_BUCKET"]
+else:
+    BUCKET = sys.argv[1]
 
 def scrubber(event, context):
     """
@@ -32,27 +35,29 @@ def scrubber(event, context):
         destination = event["Records"][0]["s3"]["object"]["key"].replace("uploaded", "scrubbed")
         # Wait for the object to finish appearing
         # S3 sometimes has not finished its internal replication for small files
-        waiter = s3.get_waiter("object_exists")
+        waiter = __S3.get_waiter("object_exists")
         waiter.wait(Bucket=bucket, Key=source)
         # Download the object, stream through it performing cleanup, write it to destination
 
         # Normalize the filenames from "sub-1" to "sub-n" and use "0001.json" - "nnnn".json
         destination = destination.replace("sub-", "")
-        destinationParts = destination.split("/")
-        destinationParts[len(destinationParts) - 1] = destinationParts[len(destinationParts) - 1].zfill(10)
-        newDestination = ""
-        for part in destinationParts:
-            newDestination = newDestination + part + "/"
-        destination = newDestination[:-1]
+        destination_parts = destination.split("/")
+        destination_parts[len(destination_parts) - 1] = destination_parts[len(destination_parts) - 1].zfill(10)
+        new_destination = ""
+        for part in destination_parts:
+            new_destination = new_destination + part + "/"
+        destination = new_destination[:-1]
         logging.warning("Converted %s to %s", source, destination)
 
 
-        resp = s3.copy_object(Bucket=bucket, CopySource="{}/{}".format(bucket, source), Key=destination)
+        resp = __S3.copy_object(Bucket=bucket,
+                                CopySource="{}/{}".format(bucket, source),
+                                Key=destination)
         logging.warning(
             "Scrubbed single file to %s/%s and got response %s", bucket, destination, resp)
-        resp = s3.delete_object(Bucket=bucket, Key=source)
+        resp = __S3.delete_object(Bucket=bucket, Key=source)
         logging.warning(
-            "Removed source file %s/%s and got response %s", bucket, source, resp) 
+            "Removed source file %s/%s and got response %s", bucket, source, resp)
         return resp
     except Exception as e:
         logging.error(e)
@@ -67,11 +72,11 @@ def watcher(event, context):
     logging.warning(
         "Received event watcher: %s", event)
     results = []
-    for key in s3.list_objects(Bucket = BUCKET, Prefix = "watch/queue/")["Contents"]:
-        if (key["Key"] != "watch/queue/"):
+    for key in __S3.list_objects(Bucket=BUCKET, Prefix="watch/queue/")["Contents"]:
+        if key["Key"] != "watch/queue/":
             results.append(key["Key"])
-            logging.warning("Triggering Watch Event: %s",key["Key"])
-            combine.evaluateWatcher(BUCKET, key)
+            logging.warning("Triggering Watch Event: %s", key["Key"])
+            combine.evaluate_watcher(BUCKET, key)
 
     body = {
         "message": results
@@ -94,7 +99,6 @@ def runner(event, context):
 
 
 if __name__ == "__main__":
-    BUCKET = sys.argv[1]
     logging.warning("Launched with %s", sys.argv)
     watcher(None, None)
 

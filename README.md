@@ -15,10 +15,9 @@
 ### This will kick off the combine job, which will stitch all of the files together and dump them in {sourceBucket}/out/jobId/foo.json
 
 ## But wait there's more!
-### Early testing showed files had a sweet spot of ~8-12 MB for stitching and ~1GB per 80s
-### To avoid even getting close to Lambda timeouts, we will cap file sizes at 1GB, 2GB, and 4GB
-### Suppose foo.json was ~3.5GB, it will shard results out to {sourceBucket}/uploaded/jobId_1/foo-0001.json - {sourceBucket}/uploaded/jobId_1/foo-0004.json
-### And write a new manifest with double the file size.
+### Early testing showed files had a sweet spot of ~8-12 MB for stitching and ~1GB per 90s
+### To avoid even getting close to Lambda timeouts, we will cap file sizes at 1GB and then 4GB
+### First run will create 10 1GB chunks, second run will create 2 4GB chunks and a 2GB chunk, third run delivers the pieces
 
 # Pitfalls
 ## MultiPart upload can't be larger than 10,000 parts
