@@ -1,4 +1,4 @@
-service: aws-python-simple-http-endpoint
+service: pyCombiner
 
 frameworkVersion: ">=1.2.0 <2.0.0"
 
@@ -23,7 +23,7 @@ functions:
             - suffix: .json
   combineWatcher: # Watch for multi-part pieces arriving 
     handler: handler.watcher
-    events:
+    events: # TODO: Turn into a cloudwatch schedule instead of manual invocation
       - http:
           method: GET
           path: /watchQueue
