@@ -98,6 +98,7 @@ def process_combination(configuration, bucket, key, watched_parts):
             Payload=str.encode(json.dumps(event))
         )
     move_file_in_bucket(bucket, key.replace("/queue", "/run"), "/run", "/done")
+    return
 
 
 def collect_parts(bucket, prefix):
@@ -161,6 +162,7 @@ def run_single_concatenation(parts_list, bucket, result_filepath):
     """
     if len(parts_list) > 1:
         # perform multi-part upload
+        # TODO: Serial calls to lambda with current index
         upload_id = initiate_concatenation(bucket, result_filepath)
         parts_mapping = assemble_parts_to_concatenate(
             result_filepath, upload_id, bucket, parts_list)
@@ -173,6 +175,7 @@ def run_single_concatenation(parts_list, bucket, result_filepath):
             "Copied single file to %s and got response %s", result_filepath, resp)
     else:
         logging.warning("No files to concatenate for %s", result_filepath)
+    return
 
 def initiate_concatenation(bucket, result_filename):
     """
@@ -206,6 +209,7 @@ def complete_concatenation(result_filename, upload_id, bucket, parts_mapping):
         logging.warning(
             "Finished concatenation for file %s, with upload id #%s, and parts mapping: %s",
             result_filename, upload_id, parts_mapping)
+    return
 
 def assemble_parts_to_concatenate(result_filename, upload_id, bucket, parts_list):
     """
@@ -220,9 +224,7 @@ def assemble_parts_to_concatenate(result_filename, upload_id, bucket, parts_list
 
     # assemble parts large enough for direct S3 copy
     # part numbers are 1 indexed
-
     for part_num, source_part in enumerate(s3_parts, 1):
-        # t = threading.Thread(target = upload, args=(fname,)).start()
         resp = __S3.upload_part_copy(Bucket=bucket,
                                      Key=result_filename,
                                      PartNumber=part_num,
@@ -279,3 +281,4 @@ def move_file_in_bucket(bucket, key, source, dest):
     resp = __S3.delete_object(Bucket=bucket, Key=key)
     logging.warning(
         "Deleted source event %s and got response %s", "{}/{}".format(bucket, key), resp)
+    return
