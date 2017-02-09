@@ -4,6 +4,7 @@ Helper project to provide lambda-ized T of ETL.  Receive a stream of small objec
 
 ## Deployment
 PRE: Have nodejs and python installed
+
 PRE: Have the AWS CLI set up and configured for the account you want to deploy to
 ```bash
     pip install awscli
@@ -30,22 +31,36 @@ This project assumes there is a file called deploy.env.yml at the root configure
 
 ## Event Flow
 Somewhere in ETL land, a 10GB file gets streamed out into 10MB chunks
+
     When the ETL finishes, it writes a manifest to {sourceBucket}/watch/queue
+
     These chunks write to {sourceBucket}/uploaded/jobId/foo-0001.json through {sourceBucket}/uploaded/jobId/foo-1000.json
+    
     As each chunk lands, it gets picked up, normalized, and deposited into {sourceBucket}/scrubbed
+
 A disconnected Watch job fires off every minute and looks for files in {sourceBucket}/watch/queue (Coming Soon!)
+
     If there is a job queued AND all files have landed, move the manifest from {sourceBucket}/watch/queue to {sourceBucket}/watch/run and fire the signal to combine them
+    
     This will kick off the combine job, which will stitch all of the files together and dump them in {sourceBucket}/out/jobId/foo.json
+    
     Finally, dump the manifest into {sourceBucket}/watch/done once all lmabda jobs have been submitted
 
 ## But wait there's more!
-  Early testing showed files had a sweet spot of ~8-12 MB for stitching and ~1GB per 90s
-  To avoid even getting close to Lambda timeouts, we will cap file size for first run at 1GB
-  If the total combine file size is >1GB (hint, it probably will be), we will spin up a jobId_1 manifest that combines the output of the first job
-  First run will create 10 1GB chunks, second run will stitch all of the 1GB chunks together into the final destination
+    Early testing showed files had a sweet spot of ~8-12 MB for stitching and ~1GB per 90s
+
+    To avoid even getting close to Lambda timeouts, we will cap file size for first run at 1GB
+  
+    If the total combine file size is >1GB (hint, it probably will be), we will spin up a jobId_1 manifest that combines the output of the first job
+  
+    First run will create 10 1GB chunks, second run will stitch all of the 1GB chunks together into the final destination
 
 ## Pitfalls
+    
     MultiPart upload can't be larger than 10,000 parts -- need to handle second pass of >10 TB (yagni, add this later if it ever comes up)
+    
     MultiPart upload can't attach files larger than 5GB -- only relevant if we need a third pass
+    
     Output files larger than 5GB can't be copied to new and exciting destinations
+    
         investigate copy_part_from_key for moving giganormous files
